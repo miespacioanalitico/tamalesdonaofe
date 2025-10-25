@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.fade-in {
+  animation: fadeIn 1.2s cubic-bezier(.39,.575,.565,1) both;
+}
+@keyframes fadeIn {
+  0% { opacity: 0; transform: scale(.9) translateY(15px);}
+  100% { opacity: 1; transform: scale(1) translateY(0);}
+}
+.btn-animate {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-animate:hover, .btn-animate:focus {
+  transform: scale(1.07) translateY(-2px);
+  box-shadow: 0 4px 14px rgba(190,106,21,0.18);
+}
