@@ -1,35 +1,33 @@
-// src/App.jsx
-import React, { useState } from 'react'
-import { Helmet } from 'react-helmet'
-import Header from './components/Header'
-import Hero from './components/Hero'
-import Gallery from './components/Gallery'
-import ProductGallery from './components/ProductGallery' // Se mantiene la importación aunque se mueva la lógica del modal
-import UbicacionGallery from './components/UbicacionGallery'
-import Comments from './components/Comments'
-import ContactForm from './components/ContactForm'
-import FloatingButtons from './components/FloatingButtons'
-import BackgroundSelector from './components/BackgroundSelector'
-import AudioPlayer from './components/AudioPlayer'
-import ChatbotGemini from './components/ChatbotGemini'
-import Footer from './components/Footer' // Lo añadiremos en el siguiente paso
+// UBICACIÓN: src/App.jsx
+import React from 'react';
+import { Helmet } from 'react-helmet';
+// --- Hooks y Lógica Central ---
+import useNavigation from './hooks/useNavigation';
+// --- Componentes ---
+import Header from './components/Header';
+import Hero from './components/Hero';
+import Gallery from './components/Gallery';
+import UbicacionGallery from './components/UbicacionGallery'; // <--- RUTA CORREGIDA
+import Comments from './components/Comments';
+import ContactForm from './components/ContactForm';
+import FloatingButtons from './components/FloatingButtons';
+import BackgroundSelector from './components/BackgroundSelector';
+import AudioPlayer from './components/AudioPlayer';
+import ChatbotGemini from './components/ChatbotGemini';
+import Footer from './components/Footer'; // Importación de nuevo componente
 
-// Importamos el hook de navegación
-import { useNavigation } from './hooks/useNavigation';
-
+// Mapeo de secciones a sus componentes
 const SECTIONS = {
   hero: <Hero />,
   galeria: <Gallery />,
-  productos: <Gallery />, // Usamos el mismo componente para ambos fines
   ubicacion: <UbicacionGallery />,
   comentarios: <Comments />,
   contacto: <ContactForm />
-}
+};
 
 export default function App() {
-  // Usamos el nuevo hook para manejar la navegación
-  const [section, navigateTo] = useNavigation(); 
-  const [bg, setBg] = useState('bgTamales')
+  const [section, setSection] = useNavigation(); // Usamos el hook de navegación
+  const [bg, setBg] = React.useState('bgTamales');
 
   // SEO config
   const SEO = {
@@ -38,7 +36,7 @@ export default function App() {
     keywords: "tamales, atole, café, torta de tamal, mole rojo, rajas, verde, CDMX, comida mexicana, desayuno",
     url: "https://tamales-dona-ofe.vercel.app",
     image: "/logo.png"
-  }
+  };
 
   return (
     <div className={`min-h-screen font-tamal transition-all duration-500 ${bg} relative`}>
@@ -58,19 +56,19 @@ export default function App() {
         <meta name="twitter:image" content={SEO.image} />
         <html lang="es" />
       </Helmet>
+      
+      {/* Elementos fijos y de fondo */}
       <AudioPlayer />
-      {/* Pasamos la función navigateTo en lugar de setSection */}
-      <Header setSection={navigateTo} section={section} />
       <BackgroundSelector setBg={setBg} />
-      <main className="fade-in pt-4 pb-16 px-2 md:px-4">
-        {/* El componente actual se envuelve en un div con su ID para el Hash Link */}
-        <div id={section}>
-          {SECTIONS[section]}
-        </div>
+
+      {/* Contenido principal */}
+      <Header setSection={setSection} section={section} />
+      <main className="fade-in pt-4 pb-16 px-2 md:px-4 max-w-7xl mx-auto">
+        {SECTIONS[section]}
       </main>
-      <FloatingButtons />
+      <FloatingButtons setSection={setSection} />
       <ChatbotGemini />
-      {/* <Footer /> */}
+      <Footer />
     </div>
-  )
+  );
 }
