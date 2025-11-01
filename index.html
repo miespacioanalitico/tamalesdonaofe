@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Usamos la fuente Montserrat para la identidad de marca -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;700;900&display=swap" rel="stylesheet">
+    <title>Tamales Caseros Doña Ofe - Sabor, Tradición y Café</title>
+    <!-- Carga de Tailwind CSS (se inicializa en src/index.css) -->
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- 1. Carga de los módulos del SDK de Firebase con type="module" -->
+    <!-- Esto debe hacerse antes de cargar main.jsx, pero después del root div -->
+    <script type="module">
+        window.firebase = {};
+    </script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+    <script type="module" src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Carga del punto de entrada de React -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
