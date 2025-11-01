@@ -1019,7 +1019,7 @@ const Hero = () => {
 const App = () => {
   const { isFirebaseReady } = useFirebase();
 
-  // Función de ayuda para la navegación (scroll)
+  // Función de ayuda para la navegación (scroll)1
   const HeaderWithScroll = useMemo(() => (
     <Header navItems={NAV_ITEMS} />
   ), []);
