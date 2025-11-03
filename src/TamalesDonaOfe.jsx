@@ -5,16 +5,17 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 // Importaciones estándar de Firebase para entornos React/Vite
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+// NOTA: Se eliminaron las importaciones de Firestore para resolver el error de permisos/carrera en el chat.
+// import { getFirestore, doc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 
 // --- Global Setup for Firebase (Variables inyectadas por el entorno) ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// Initialize Firebase services outside of React component lifecycle
+// Initialize Firebase Auth (Mantenemos Auth, es necesario para la sesión)
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// const db = getFirestore(app); // Eliminado
 const auth = getAuth(app);
 
 // --- Custom Hook to handle Firebase authentication and provide context ---
@@ -51,9 +52,9 @@ const useFirebase = () => {
     return () => unsubscribe();
   }, []);
 
-  // Proporciona los objetos y estados de Firebase
+  // Nota: Devolvemos `null` para `db` ya que no se usa Firestore para el chat en esta versión.
   return { 
-    db, 
+    // db, // db no es devuelto
     auth, 
     userId, 
     appId, 
@@ -433,8 +434,8 @@ const ContactForm = () => {
                             disabled={total === 0}
                         >
                             <span>{isCopied ? '¡Mensaje Listo!' : 'Generar Pedido por WhatsApp'}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-whatsapp">
-                                <path d="M9 19c-1.5 0-3-.5-4.5-1.5L3 19l1.5-4.5C3.5 13 3 11.5 3 10c0-3.9 3.1-7 7-7s7 3.1 7 7c0 3.9-3.1 7-7 7z"></path>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-message-circle">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                             </svg>
                         </button>
                         {showTooltip && total > 0 && (
@@ -456,11 +457,25 @@ const ContactForm = () => {
 
 // 4.1 Chatbot Vendedor Experto (Tamalín)
 const ChatbotGemini = () => {
-  const { db, userId, isFirebaseReady } = useFirebase();
+  // Ya no usamos db, solo isFirebaseReady para saber que la autenticación está lista.
+  const { isFirebaseReady } = useFirebase(); 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Inicializar mensajes con el saludo del chatbot (simulando carga de historial)
+  useEffect(() => {
+    // Solo inicializa si no hay mensajes y Firebase está listo (para evitar duplicados)
+    if (isFirebaseReady && messages.length === 0) {
+        setMessages([{
+            id: Date.now(),
+            sender: 'model',
+            text: getChatbotGreeting(),
+            sources: []
+        }]);
+    }
+  }, [isFirebaseReady]);
 
   // Scroll al final de los mensajes
   const scrollToBottom = () => {
@@ -469,25 +484,13 @@ const ChatbotGemini = () => {
 
   useEffect(scrollToBottom, [messages]);
 
-  // Función para guardar mensajes en Firestore
+  // FUNCIÓN ELIMINADA: saveMessage ya no es necesario, usamos setMessages
+  /*
   const saveMessage = useCallback(async (sender, text, sources = []) => {
-    if (!db || !userId) {
-      console.error("Firestore not ready or user ID missing.");
-      return;
-    }
-    
-    try {
-      const chatCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/chats`);
-      await addDoc(chatCollectionRef, {
-        sender,
-        text,
-        timestamp: serverTimestamp(),
-        sources: sources,
-      });
-    } catch (e) {
-      console.error("Error adding document: ", e);
-    }
-  }, [db, userId, appId]);
+      // ... Lógica de Firestore eliminada
+  }, []); 
+  */
+
 
   // Función para manejar reintentos de fetch (Gemini API)
   const fetchWithRetry = useCallback(async (url, options, maxRetries = 3) => {
@@ -523,6 +526,7 @@ const ChatbotGemini = () => {
 
   // Función para enviar mensaje a Gemini
   const sendMessageToGemini = useCallback(async (userMessage) => {
+    // Usamos placeholder vacío, el entorno la inyecta automáticamente.
     const apiKey = ""; 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
@@ -568,36 +572,18 @@ const ChatbotGemini = () => {
         }
       }
 
-      await saveMessage('model', aiText, sources);
+      // Reemplazamos saveMessage por setMessages local
+      setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender: 'model', text: aiText, sources }]);
 
     } catch (error) {
       console.error("Error al llamar a Gemini API:", error);
-      await saveMessage('model', "¡Híjole! Parece que mi conexión con la IA falló. Pero no te preocupes, los tamales siguen calientitos. ¿Qué más se te ofrece?", []);
+      // Reemplazamos saveMessage por setMessages local para errores
+      setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender: 'model', text: "¡Híjole! Parece que mi conexión con la IA falló. Pero no te preocupes, los tamales siguen calientitos. ¿Qué más se te ofrece?", sources: [] }]);
     } finally {
       setIsLoading(false);
     }
-  }, [messages, fetchWithRetry, systemInstruction, saveMessage]);
+  }, [messages, fetchWithRetry, systemInstruction]);
 
-  // Listener para cargar mensajes de Firestore
-  useEffect(() => {
-    if (!db || !userId || !isFirebaseReady) return;
-
-    // Ruta de la colección: /artifacts/{appId}/users/{userId}/chats
-    const chatCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/chats`);
-    const q = query(chatCollectionRef, limit(50));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })).sort((a, b) => a.timestamp?.toMillis() - b.timestamp?.toMillis());
-      setMessages(msgs);
-    }, (error) => {
-      console.error("Error fetching chat messages:", error);
-    });
-
-    return () => unsubscribe();
-  }, [db, userId, appId, isFirebaseReady]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -607,8 +593,8 @@ const ChatbotGemini = () => {
     setInput('');
     setIsLoading(true);
 
-    // Guardar mensaje del usuario
-    saveMessage('user', userMessage);
+    // Guardar mensaje del usuario localmente
+    setMessages(prev => [...prev, { id: Date.now(), sender: 'user', text: userMessage, sources: [] }]);
 
     // Enviar a Gemini
     sendMessageToGemini(userMessage);
@@ -719,7 +705,7 @@ const ChatbotGemini = () => {
             </div>
             {!isFirebaseReady && !isLoading && (
                 <p className="text-center text-sm text-red-500 mt-2">
-                    Cargando servicios de Firebase. Espera un momento...
+                    Cargando servicios de autenticación...
                 </p>
             )}
           </form>
@@ -1031,7 +1017,7 @@ const App = () => {
         <div className="p-8 rounded-xl shadow-lg text-center" style={{ backgroundColor: COLORS.primary }}>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
             <p className="text-white text-lg">Cargando la magia de Doña Ofe...</p>
-            <p className="text-sm mt-2 text-white opacity-70">Preparando Firebase y el chatbot.</p>
+            <p className="text-sm mt-2 text-white opacity-70">Preparando Firebase.</p>
         </div>
       </div>
     );
