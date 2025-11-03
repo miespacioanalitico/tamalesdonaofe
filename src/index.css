@@ -1,11 +1,8 @@
-/* Este es el archivo de estilos principal para la configuración de Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Aplicamos la fuente Montserrat a toda la página */
+/* Estilos adicionales para la aplicación */
 body {
-    font-family: 'Montserrat', sans-serif;
-    @apply bg-gray-50; /* Un fondo muy ligero para la web */
+    @apply bg-gray-50;
 }
-    * Confirma los cambios (**`Commit new file`**).
