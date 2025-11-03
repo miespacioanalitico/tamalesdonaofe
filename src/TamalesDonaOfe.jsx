@@ -433,8 +433,8 @@ const ContactForm = () => {
                             disabled={total === 0}
                         >
                             <span>{isCopied ? '¡Mensaje Listo!' : 'Generar Pedido por WhatsApp'}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-message-circle">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-whatsapp">
+                                <path d="M9 19c-1.5 0-3-.5-4.5-1.5L3 19l1.5-4.5C3.5 13 3 11.5 3 10c0-3.9 3.1-7 7-7s7 3.1 7 7c0 3.9-3.1 7-7 7z"></path>
                             </svg>
                         </button>
                         {showTooltip && total > 0 && (
@@ -867,7 +867,7 @@ const HeroGallery = () => {
                         key={index}
                         onClick={() => setCurrentIndex(index)}
                         className={`w-3 h-3 rounded-full transition-colors duration-300 ${index === currentIndex ? 'bg-white scale-110 shadow-md' : 'bg-gray-400 bg-opacity-70 hover:bg-white'}`}
-                        aria-label={`Go to slide ${index + 1}`}
+                        aria-label="Go to slide"
                     />
                 ))}
             </div>
@@ -1019,7 +1019,7 @@ const Hero = () => {
 const App = () => {
   const { isFirebaseReady } = useFirebase();
 
-  // Función de ayuda para la navegación (scroll)1
+  // Función de ayuda para la navegación (scroll)
   const HeaderWithScroll = useMemo(() => (
     <Header navItems={NAV_ITEMS} />
   ), []);
