@@ -5,17 +5,32 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 // Importaciones estándar de Firebase para entornos React/Vite
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-// NOTA: Se eliminaron las importaciones de Firestore para resolver el error de permisos/carrera en el chat.
-// import { getFirestore, doc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { getFirestore, onSnapshot, collection, query, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 
 // --- Global Setup for Firebase (Variables inyectadas por el entorno) ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+// Usamos una configuración de Firebase anónima si la configuración inyectada falla,
+// para evitar el error (auth/invalid-api-key) y permitir que la app se renderice.
+const DEFAULT_FIREBASE_CONFIG = {
+    apiKey: "DUMMY_API_KEY", // Placeholder para evitar error de inicialización
+    projectId: "dona-ofe-project",
+    authDomain: "dona-ofe-project.firebaseapp.com",
+};
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// Initialize Firebase Auth (Mantenemos Auth, es necesario para la sesión)
-const app = initializeApp(firebaseConfig);
-// const db = getFirestore(app); // Eliminado
+let configToUse = DEFAULT_FIREBASE_CONFIG;
+try {
+    const injectedConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    if (injectedConfig && injectedConfig.apiKey && injectedConfig.projectId) {
+        configToUse = injectedConfig;
+    }
+} catch (e) {
+    console.warn("Error parsing injected Firebase config. Using anonymous fallback.");
+}
+
+// Initialize Firebase services outside of React component lifecycle
+const app = initializeApp(configToUse);
+const db = getFirestore(app); // Necesitamos esta referencia aunque el chat no la use
 const auth = getAuth(app);
 
 // --- Custom Hook to handle Firebase authentication and provide context ---
@@ -28,11 +43,14 @@ const useFirebase = () => {
     const signIn = async () => {
       try {
         if (initialAuthToken) {
+          // Intentar iniciar con el token de sesión (lo que Vercel no hace, pero Canvas sí)
           await signInWithCustomToken(auth, initialAuthToken);
         } else {
+          // Si no hay token inyectado o falla, usar Auth Anónimo
           await signInAnonymously(auth);
         }
       } catch (error) {
+        // El error (auth/invalid-api-key) se maneja aquí si la config es real pero la clave es mala.
         console.error("Firebase Auth Error:", error);
       }
     };
@@ -52,9 +70,9 @@ const useFirebase = () => {
     return () => unsubscribe();
   }, []);
 
-  // Nota: Devolvemos `null` para `db` ya que no se usa Firestore para el chat en esta versión.
+  // Proporciona los objetos y estados de Firebase
   return { 
-    // db, // db no es devuelto
+    db, 
     auth, 
     userId, 
     appId, 
@@ -434,7 +452,7 @@ const ContactForm = () => {
                             disabled={total === 0}
                         >
                             <span>{isCopied ? '¡Mensaje Listo!' : 'Generar Pedido por WhatsApp'}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-message-circle">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-whatsapp">
                                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                             </svg>
                         </button>
@@ -484,14 +502,6 @@ const ChatbotGemini = () => {
 
   useEffect(scrollToBottom, [messages]);
 
-  // FUNCIÓN ELIMINADA: saveMessage ya no es necesario, usamos setMessages
-  /*
-  const saveMessage = useCallback(async (sender, text, sources = []) => {
-      // ... Lógica de Firestore eliminada
-  }, []); 
-  */
-
-
   // Función para manejar reintentos de fetch (Gemini API)
   const fetchWithRetry = useCallback(async (url, options, maxRetries = 3) => {
     for (let i = 0; i < maxRetries; i++) {
@@ -526,7 +536,7 @@ const ChatbotGemini = () => {
 
   // Función para enviar mensaje a Gemini
   const sendMessageToGemini = useCallback(async (userMessage) => {
-    // Usamos placeholder vacío, el entorno la inyecta automáticamente.
+    // CLAVE DE API DE GEMINI: Usamos placeholder vacío, el entorno la inyecta automáticamente.
     const apiKey = ""; 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
@@ -572,12 +582,12 @@ const ChatbotGemini = () => {
         }
       }
 
-      // Reemplazamos saveMessage por setMessages local
+      // Guardar mensaje del modelo localmente
       setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender: 'model', text: aiText, sources }]);
 
     } catch (error) {
       console.error("Error al llamar a Gemini API:", error);
-      // Reemplazamos saveMessage por setMessages local para errores
+      // Guardar mensaje de error localmente
       setMessages(prev => [...prev, { id: Date.now() + Math.random(), sender: 'model', text: "¡Híjole! Parece que mi conexión con la IA falló. Pero no te preocupes, los tamales siguen calientitos. ¿Qué más se te ofrece?", sources: [] }]);
     } finally {
       setIsLoading(false);
@@ -635,7 +645,7 @@ const ChatbotGemini = () => {
 
           {/* Área de Mensajes */}
           <div className="flex-grow p-4 overflow-y-auto space-y-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && isFirebaseReady && (
                 <div className="text-center text-gray-500 mt-20">
                     <img src={TAMALIN_IMAGE_SRC} alt="Tamalín" className="w-20 h-20 mx-auto mb-4 opacity-70" />
                     <p>{getChatbotGreeting()}</p>
@@ -1017,7 +1027,7 @@ const App = () => {
         <div className="p-8 rounded-xl shadow-lg text-center" style={{ backgroundColor: COLORS.primary }}>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
             <p className="text-white text-lg">Cargando la magia de Doña Ofe...</p>
-            <p className="text-sm mt-2 text-white opacity-70">Preparando Firebase.</p>
+            <p className="text-sm mt-2 text-white opacity-70">Preparando la autenticación.</p>
         </div>
       </div>
     );
