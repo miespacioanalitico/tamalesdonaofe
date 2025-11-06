@@ -5,53 +5,63 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 // Importaciones estándar de Firebase para entornos React/Vite
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+// Nota: Se importan las funciones de Firestore, pero el chat usa estado local.
 import { getFirestore, onSnapshot, collection, query, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 
 // --- Global Setup for Firebase (Variables inyectadas por el entorno) ---
-// Usamos una configuración de Firebase anónima si la configuración inyectada falla,
-// para evitar el error (auth/invalid-api-key) y permitir que la app se renderice.
-const DEFAULT_FIREBASE_CONFIG = {
-    apiKey: "DUMMY_API_KEY", // Placeholder para evitar error de inicialización
-    projectId: "dona-ofe-project",
-    authDomain: "dona-ofe-project.firebaseapp.com",
-};
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-let configToUse = DEFAULT_FIREBASE_CONFIG;
+let app = null;
+let auth = null;
+let db = null;
+let useFallback = true;
+
 try {
     const injectedConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    
+    // Verificar si existe una configuración de API válida (del Canvas)
     if (injectedConfig && injectedConfig.apiKey && injectedConfig.projectId) {
-        configToUse = injectedConfig;
+        app = initializeApp(injectedConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        useFallback = false;
+    } else {
+        console.log("No valid Firebase config detected. Running in client-side fallback mode.");
     }
 } catch (e) {
-    console.warn("Error parsing injected Firebase config. Using anonymous fallback.");
+    console.error("Error during Firebase initialization attempt. Using fallback:", e);
 }
 
-// Initialize Firebase services outside of React component lifecycle
-const app = initializeApp(configToUse);
-const db = getFirestore(app); // Necesitamos esta referencia aunque el chat no la use
-const auth = getAuth(app);
 
 // --- Custom Hook to handle Firebase authentication and provide context ---
 const useFirebase = () => {
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+  const [isFirebaseReady, setIsFirebaseReady] = useState(useFallback); // Listo si usamos fallback
 
   useEffect(() => {
+    if (useFallback) {
+        // En modo fallback, solo establecemos un userId anónimo y terminamos
+        setUserId(crypto.randomUUID()); 
+        setLoading(false);
+        setIsFirebaseReady(true);
+        return;
+    }
+    
+    // Lógica de inicio de sesión normal si la configuración es válida
     const signIn = async () => {
       try {
         if (initialAuthToken) {
-          // Intentar iniciar con el token de sesión (lo que Vercel no hace, pero Canvas sí)
           await signInWithCustomToken(auth, initialAuthToken);
         } else {
-          // Si no hay token inyectado o falla, usar Auth Anónimo
           await signInAnonymously(auth);
         }
       } catch (error) {
-        // El error (auth/invalid-api-key) se maneja aquí si la config es real pero la clave es mala.
-        console.error("Firebase Auth Error:", error);
+        console.error("Firebase Auth Error (Auth Failed):", error);
+        // Si la autenticación falla, marcamos como listo para que el resto de la app funcione.
+        setUserId(crypto.randomUUID());
+        setIsFirebaseReady(true);
       }
     };
 
@@ -67,10 +77,12 @@ const useFirebase = () => {
       setIsFirebaseReady(true);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (!useFallback) unsubscribe();
+    };
   }, []);
 
-  // Proporciona los objetos y estados de Firebase
+  // Proporcionamos las instancias. Serán null si usamos fallback.
   return { 
     db, 
     auth, 
@@ -475,7 +487,8 @@ const ContactForm = () => {
 
 // 4.1 Chatbot Vendedor Experto (Tamalín)
 const ChatbotGemini = () => {
-  // Ya no usamos db, solo isFirebaseReady para saber que la autenticación está lista.
+  // Ahora useFirebase maneja la detección de configuración. Si usaFallback es true, 
+  // isFirebaseReady será true inmediatamente, y los errores de Auth/Firestore se evitan.
   const { isFirebaseReady } = useFirebase(); 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -665,20 +678,7 @@ const ChatbotGemini = () => {
                   style={{ backgroundColor: msg.sender === 'user' ? COLORS.accent : COLORS.secondary }}
                 >
                   <p className="whitespace-pre-wrap">{msg.text}</p>
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-2 text-xs opacity-80">
-                      <p className="font-semibold">Fuentes:</p>
-                      <ul className="list-disc pl-4">
-                        {msg.sources.map((src, index) => (
-                          <li key={index}>
-                            <a href={src.uri} target="_blank" rel="noopener noreferrer" className="underline hover:text-white transition duration-200">
-                              {src.title}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  {/* Se eliminó la visualización de fuentes ya que el chat es local */}
                 </div>
               </div>
             ))}
